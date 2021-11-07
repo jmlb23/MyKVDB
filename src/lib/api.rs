@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::cell::RefCell;
 
 enum Command{
-   Ping, Set(String, String), Delete(String), Get(String)
+   Ping, Set(String, String), Delete(String), Get(String), Update(String, String), CommandNotRecognized
 }
 
 pub struct Api {
@@ -38,8 +38,11 @@ impl Api {
         } else if message.contains("GET") {
             let vector = message.split_whitespace().collect::<Vec<&str>>();
             Command::Get(vector[1].to_owned().to_string())
+        } else if message.contains("UPDATE") {
+            let vector = message.split_whitespace().collect::<Vec<&str>>();
+            Command::Update(vector[1].to_owned().to_string(),vector[2].to_owned().to_string())
         } else {
-            Command::Ping
+            Command::CommandNotRecognized
         }
     }
 
@@ -58,11 +61,15 @@ impl Api {
                 writer.write(key.as_bytes()).unwrap();
             },
             Command::Get(key) => {
-                if let Some((key, value)) = store.get_key_value(&key){
-                    writer.write(value.as_bytes());
+                if let Some((_, value)) = store.get_key_value(&key){
+                    writer.write(value.as_bytes()).expect("Unexpected error.");
                 } else {
-                    writer.write("0".as_bytes());
+                    writer.write("0".as_bytes()).expect("Unexpected error.");
                 }
+            },
+            Command::Update(key, new_value) => {
+                store.remove(&key);
+                store.insert(key, new_value);
             },
             _ => {
                 writer.write("Not Recognized".as_bytes()).unwrap();
@@ -83,7 +90,7 @@ impl Api {
                 self.handle(&mut writer, &req_as_string);
             }
             Err(_) => { 
-                
+                println!("Unexpected Error")
             }
         }
       }
