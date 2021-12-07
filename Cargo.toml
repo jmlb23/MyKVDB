@@ -12,3 +12,4 @@ path = "src/lib/lib.rs"
 
 
 [dependencies]
+crossbeam-utils = "0.8"
