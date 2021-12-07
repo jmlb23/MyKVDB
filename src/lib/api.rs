@@ -4,16 +4,14 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::net::TcpStream;
 use std::io::Write;
-use std::collections::BTreeMap;
-use std::cell::RefCell;
-
+use crate::store_api::Store;
 enum Command{
    Ping, Set(String, String), Delete(String), Get(String), Update(String, String), CommandNotRecognized
 }
 
 pub struct Api {
     socket: TcpListener,
-    store: RefCell<BTreeMap<String, String>>
+    store: Store
 }
 
 impl Api {
@@ -21,7 +19,7 @@ impl Api {
     pub fn new(address: &str) -> Self {
         Api {
           socket: TcpListener::bind(address).unwrap(),
-          store: RefCell::new(BTreeMap::new())
+          store: Store::new()
         }
     }
     
@@ -47,29 +45,28 @@ impl Api {
     }
 
     fn handle(&self, writer: &mut BufWriter<&TcpStream>, message: &str){
-        let mut store= self.store.borrow_mut();
         let command = Api::parse(&message.replace("\n",""));
         match command {
             Command::Ping => {
                 writer.write("PONG".as_bytes()).unwrap();
             },
             Command::Set(key, value) => {
-                store.insert(key, value);
+                self.store.insert(&key, &value)
             },
             Command::Delete(key) => {
-                store.remove(&key);
+                self.store.remove(&key);
                 writer.write(key.as_bytes()).unwrap();
             },
             Command::Get(key) => {
-                if let Some((_, value)) = store.get_key_value(&key){
+                if let Some(value) = &self.store.get(&key){
                     writer.write(value.as_bytes()).expect("Unexpected error.");
                 } else {
                     writer.write("0".as_bytes()).expect("Unexpected error.");
                 }
             },
             Command::Update(key, new_value) => {
-                store.remove(&key);
-                store.insert(key, new_value);
+                self.store.remove(&key);
+                self.store.insert(&key, &new_value);
             },
             _ => {
                 writer.write("Not Recognized".as_bytes()).unwrap();
