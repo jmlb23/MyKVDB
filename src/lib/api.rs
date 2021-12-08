@@ -11,6 +11,7 @@ enum Command {
     Delete(String),
     Get(String),
     Update(String, String),
+    TTL(String, String),
     CommandNotRecognized,
 }
 
@@ -48,6 +49,12 @@ impl Api {
                 vector[1].to_owned().to_string(),
                 vector[2].to_owned().to_string(),
             )
+        } else if message.contains("TTL") {
+            let vector = message.split_whitespace().collect::<Vec<&str>>();
+            Command::TTL(
+                vector[1].to_owned().to_string(),
+                vector.get(2).unwrap_or(&"0").to_owned().to_owned(),
+            )
         } else {
             Command::CommandNotRecognized
         }
@@ -68,12 +75,19 @@ impl Api {
                 if let Some(value) = &self.store.get(&key) {
                     writer.write(value.as_bytes()).expect("Unexpected error.");
                 } else {
-                    writer.write("0".as_bytes()).expect("Unexpected error.");
+                    writer.write("Not Found".as_bytes()).expect("Unexpected error.");
                 }
             }
             Command::Update(key, new_value) => {
                 self.store.remove(&key);
                 self.store.insert(&key, &new_value);
+            }
+            Command::TTL(key, ttl) => {
+                if let Ok(_) = self.store.ttl(&key, ttl.parse::<u32>().expect("Canno't convert ttl to u32")){
+                    ()
+                }else {
+                    writer.write("Key not found.".as_bytes()).expect("Unexpected errror.");
+                }
             }
             _ => {
                 writer.write("Not Recognized".as_bytes()).unwrap();
