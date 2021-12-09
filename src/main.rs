@@ -1,5 +1,8 @@
+use jsonrpc_http_server::ServerBuilder;
+use api::api::ApiImpl;
 use api::api::Api;
 use std::env;
+
 fn main() {
     let vector = env::args().collect::<Vec<String>>();
     let args = vector.iter().map(|x| x.as_str()).collect::<Vec<&str>>();
@@ -20,9 +23,14 @@ fn main() {
 }
 
 fn run_server(host: &str, port: &str) {
-    let api = Api::new(format!("{}:{}", host, port).as_str());
-    println!("server running at {}:{}", host, port);
-    api.poll();
+    let mut io = jsonrpc_core::IoHandler::new();
+	io.extend_with(ApiImpl::to_delegate(ApiImpl::new()));
+    let server = ServerBuilder::new(io)
+		.threads(3)
+		.start_http(&format!("{}:{}",host,port).parse().unwrap())
+		.unwrap();
+
+	server.wait();
 }
 
 fn print_help() {

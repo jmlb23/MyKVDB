@@ -12,4 +12,7 @@ path = "src/lib/lib.rs"
 
 
 [dependencies]
-crossbeam-utils = "0.8"
+jsonrpc-core = "18.0.0"
+jsonrpc-http-server = "18.0.0"
+jsonrpc-derive = "18.0.0"
+jsonrpc-core-client = "18.0.0"

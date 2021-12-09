@@ -1,117 +1,60 @@
+use jsonrpc_core::Error;
+use jsonrpc_core::ErrorCode::ServerError;
 use crate::store_api::Store;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::BufWriter;
-use std::io::Write;
-use std::net::TcpListener;
-use std::net::TcpStream;
-enum Command {
-    Ping,
-    Set(String, String),
-    Delete(String),
-    Get(String),
-    Update(String, String),
-    TTL(String, String),
-    CommandNotRecognized,
+use jsonrpc_core::Result;
+use jsonrpc_derive::rpc;
+
+#[rpc]
+pub trait Api {
+    #[rpc(name = "ping")]
+    fn ping(&self) -> Result<String>;
+    #[rpc(name = "delete")]
+    fn delete(&self, key: String) -> Result<()>;
+    #[rpc(name = "get")]
+    fn get(&self, key: String) -> Result<String>;
+    #[rpc(name = "set")]
+    fn set(&self, key: String, value: String) -> Result<()>;
+    #[rpc(name = "update")]
+    fn update(&self, key: String, new_value: String) -> Result<()>;
+    #[rpc(name = "ttl")]
+    fn ttl(&self, key: String, ttl: u32) -> Result<u32>;
 }
 
-pub struct Api {
-    socket: TcpListener,
+pub struct ApiImpl {
     store: Store,
 }
 
-impl Api {
-    pub fn new(address: &str) -> Self {
-        Api {
-            socket: TcpListener::bind(address).unwrap(),
+impl ApiImpl {
+    pub fn new() -> Self {
+        ApiImpl {
             store: Store::new(),
         }
     }
-    fn parse(message: &str) -> Command {
-        println!("{}", message);
-        if message.contains("PING") {
-            Command::Ping
-        } else if message.contains("SET") {
-            let vector = message.split_whitespace().collect::<Vec<&str>>();
-            Command::Set(
-                vector[1].to_owned().to_string(),
-                vector[2].to_owned().to_string(),
-            )
-        } else if message.contains("DELETE") {
-            let vector = message.split_whitespace().collect::<Vec<&str>>();
-            Command::Delete(vector[1].to_owned().to_string())
-        } else if message.contains("GET") {
-            let vector = message.split_whitespace().collect::<Vec<&str>>();
-            Command::Get(vector[1].to_owned().to_string())
-        } else if message.contains("UPDATE") {
-            let vector = message.split_whitespace().collect::<Vec<&str>>();
-            Command::Update(
-                vector[1].to_owned().to_string(),
-                vector[2].to_owned().to_string(),
-            )
-        } else if message.contains("TTL") {
-            let vector = message.split_whitespace().collect::<Vec<&str>>();
-            Command::TTL(
-                vector[1].to_owned().to_string(),
-                vector.get(2).unwrap_or(&"0").to_owned().to_owned(),
-            )
-        } else {
-            Command::CommandNotRecognized
-        }
-    }
+}
 
-    fn handle(&self, writer: &mut BufWriter<&TcpStream>, message: &str) {
-        let command = Api::parse(&message.replace("\n", ""));
-        match command {
-            Command::Ping => {
-                writer.write("PONG".as_bytes()).unwrap();
-            }
-            Command::Set(key, value) => self.store.insert(&key, &value),
-            Command::Delete(key) => {
-                self.store.remove(&key);
-                writer.write(key.as_bytes()).unwrap();
-            }
-            Command::Get(key) => {
-                if let Some(value) = &self.store.get(&key) {
-                    writer.write(value.as_bytes()).expect("Unexpected error.");
-                } else {
-                    writer.write("Not Found".as_bytes()).expect("Unexpected error.");
-                }
-            }
-            Command::Update(key, new_value) => {
-                self.store.remove(&key);
-                self.store.insert(&key, &new_value);
-            }
-            Command::TTL(key, ttl) => {
-                if let Ok(_) = self.store.ttl(&key, ttl.parse::<u32>().expect("Canno't convert ttl to u32")){
-                    ()
-                }else {
-                    writer.write("Key not found.".as_bytes()).expect("Unexpected errror.");
-                }
-            }
-            _ => {
-                writer.write("Not Recognized".as_bytes()).unwrap();
-            }
-        }
+impl Api for ApiImpl {
+    fn ping(&self) -> Result<String> {
+        Ok(String::from("PONG"))
     }
-
-    pub fn poll(&self) {
-        for stream in self.socket.incoming() {
-            match stream {
-                Ok(stream) => {
-                    let mut reader = BufReader::new(&stream);
-                    let mut writer = BufWriter::new(&stream);
-                    let mut buffer = Vec::new();
-                    let _ = reader.read_until(b'\n', &mut buffer);
-                    let req_as_string = String::from_utf8(buffer)
-                        .expect("Error parsing request")
-                        .to_owned();
-                    self.handle(&mut writer, &req_as_string);
-                }
-                Err(_) => {
-                    println!("Unexpected Error")
-                }
-            }
-        }
+    fn delete(&self, key: String) -> Result<()> {
+        Ok(self.store.remove(&key))
+    }
+    fn set(&self, key: String, value: String) -> Result<()> {
+        Ok(self.store.insert(&key, &value))
+    }
+    fn update(&self, key: String, new_value: String) -> Result<()> {
+        &self.store.remove(&key);
+        &self.store.insert(&key, &new_value);
+        Ok(())
+    }
+    fn ttl(&self, key: String, ttl: u32) -> Result<u32> {
+        &self.store.ttl(&key, ttl);
+        Ok(ttl)
+    }
+    fn get(
+        &self,
+        key: String,
+    ) -> Result<String> {
+        self.store.get(&key).ok_or(Error::new(ServerError(404)))
     }
 }
