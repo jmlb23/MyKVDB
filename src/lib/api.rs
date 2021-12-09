@@ -48,8 +48,10 @@ impl Api for ApiImpl {
         Ok(())
     }
     fn ttl(&self, key: String, ttl: u32) -> Result<u32> {
-        &self.store.ttl(&key, ttl);
-        Ok(ttl)
+        match &self.store.ttl(&key, ttl){
+            Ok(_) => Ok(ttl),
+            _ => Err(Error::new(ServerError(404)))
+        }
     }
     fn get(
         &self,
