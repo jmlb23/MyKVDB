@@ -2,6 +2,7 @@ use jsonrpc_http_server::ServerBuilder;
 use api::api::ApiImpl;
 use api::api::Api;
 use std::env;
+use jsonrpc_http_server::RestApi::Secure;
 
 fn main() {
     let vector = env::args().collect::<Vec<String>>();
@@ -27,6 +28,7 @@ fn run_server(host: &str, port: &str) {
 	io.extend_with(ApiImpl::to_delegate(ApiImpl::new()));
     let server = ServerBuilder::new(io)
 		.threads(3)
+        .rest_api(Secure)
 		.start_http(&format!("{}:{}",host,port).parse().unwrap())
 		.unwrap();
 
