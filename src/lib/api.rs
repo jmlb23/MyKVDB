@@ -1,6 +1,6 @@
+use crate::store_api::Store;
 use jsonrpc_core::Error;
 use jsonrpc_core::ErrorCode::ServerError;
-use crate::store_api::Store;
 use jsonrpc_core::Result;
 use jsonrpc_derive::rpc;
 
@@ -48,15 +48,12 @@ impl Api for ApiImpl {
         Ok(())
     }
     fn ttl(&self, key: String, ttl: u32) -> Result<u32> {
-        match &self.store.ttl(&key, ttl){
+        match &self.store.ttl(&key, ttl) {
             Ok(_) => Ok(ttl),
-            _ => Err(Error::new(ServerError(404)))
+            _ => Err(Error::new(ServerError(404))),
         }
     }
-    fn get(
-        &self,
-        key: String,
-    ) -> Result<String> {
+    fn get(&self, key: String) -> Result<String> {
         self.store.get(&key).ok_or(Error::new(ServerError(404)))
     }
 }
